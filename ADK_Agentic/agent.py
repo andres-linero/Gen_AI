@@ -52,6 +52,10 @@ def generate_filename(work_order: str, order_type: str, sales_order: str, custom
     """
     return f"{work_order} - {order_type}.{int(sales_order)}_{customer}_{jobsite}"
 
+
+def order_information():
+    
+
 # THIS IS REQUIRED - ADK looks for "root_agent"
 root_agent = Agent(
     name="delivery_processor",
