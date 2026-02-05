@@ -21,13 +21,10 @@ def fetch_customer_data(work_order: str, month: str ) -> dict:
     Returns:
         Dictionary with order details
     """
-    df = pd.read_excel(
-        "/Users/andreslinero/Desktop/Full Time Dev/Look_at_it/Tracking Orders 2026.xlsx",
-        sheet_name=month
-    )
+    df = pd.read_excel("/Users/andreslinero/Desktop/Full Time Dev/Look_at_it/Tracking Orders 2026.xlsx", sheet_name=month)
     
     # Find the matching row
-    match = df[df["Work Order/Shipment"].astype(str).str.contains(work_order, na=False)]
+    match = df[df["order_id"].astype(str).str.contains(work_order, na=False)]
     
     if match.empty:
         return {"error": f"No order found for {work_order}"}
@@ -53,8 +50,23 @@ def generate_filename(work_order: str, order_type: str, sales_order: str, custom
     return f"{work_order} - {order_type}.{int(sales_order)}_{customer}_{jobsite}"
 
 
-def order_information():
+def get_sale_rep(work_order: str, month):
+    """Detecet the sale rep that created the order
     
+        Arg: {work_order} : identify the work order to determinated wich sale rep own the order. 
+             {month} : month sheet 
+    """
+
+    df = pd.read_excel("/Users/andreslinero/Desktop/Full Time Dev/Look_at_it/Tracking Orders 2026.xlsx", sheet_name=month)
+
+    match = df [df["order_id"].astype(str).str.contains(work_order, na=False)]
+
+    if match.empty:
+        return f"Order requested not in records (RAG), check if {work_order}"
+    
+    row_match = match.iloc[0]
+    
+    return f"Slaes rep: {row_match['Requested by']} for order {work_order}"
 
 # THIS IS REQUIRED - ADK looks for "root_agent"
 root_agent = Agent(
