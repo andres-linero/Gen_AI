@@ -2,15 +2,17 @@ from google.adk.agents import Agent, SequentialAgent, ParallelAgent, LoopAgent
 from google.adk.runners import InMemoryRunner
 from google.adk.tools import AgentTool, FunctionTool, google_search
 from google.genai import types
+from google import genai
 import pandas as pd
 import os
 from dotenv import load_dotenv
+from PyPDF2 import PdfMerger
 
 load_dotenv()
 
 API_KEY = os.getenv("GOOGLE_API_KEY")
 EXCEL_PATH = os.getenv("EXCEL_PATH")
-IMAHE_PATH = os.getenv("IMAHE_PATH")
+IMAGE_PATH = os.getenv("IMAHE_PATH")
 
 def fetch_customer_data(work_order: str, month: str ) -> dict:
     """
@@ -26,7 +28,7 @@ def fetch_customer_data(work_order: str, month: str ) -> dict:
     df = pd.read_excel(EXCEL_PATH, sheet_name=month)
     
     # Find the matching row
-    match = df[df["order_id"].astype(str).str.contains(work_order, na=False)]
+    match = df[df["Order_ID"].astype(str).str.contains(work_order, na=False)]
     
     if match.empty:
         return {"error": f"No order found for {work_order}"}
@@ -35,10 +37,10 @@ def fetch_customer_data(work_order: str, month: str ) -> dict:
     
     return {
         "work_order": work_order,
-        "order_type": row["Order Type"],
-        "sales_order": row["Sales order / Rental order "],
-        "customer": row["Customer"],
-        "jobsite": row["Jobsite"]
+        "order_type": row["Order_Type"],
+        "sales_order": row["SO"],
+        "customer": row["Customer_name"],
+        "jobsite": row["Ship_to"]
     }
 
 
@@ -105,25 +107,88 @@ def match_files(folder: str) -> str:
              "id": sorted_files [i + 1 ]
              }
              pairs.append(pair)
+
+def find_ID_plus_ticket() -> dict:
+    folder_path = os.getenv("IMAGE_PATH")  # ← uses your .env variable
+    result = {}
+    client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    files = os.listdir(folder_path)
+
+    for file in files:
+        if file.endswith((".png", ".jpg", ".pdf", ".jpeg")):
+            full_path = os.path.join(folder_path, file)
+
+            uploaded_file = client.files.upload(file=full_path)  
+
+            prompt = """What work order number (W-######) is in this document?
+                        If there is no work order, is this a driver ID?
+                        Reply with ONLY the W-###### number or 'driver_id'."""
+
+            response = client.models.generate_content(        
+                model="gemini-2.0-flash",
+                contents=[uploaded_file, prompt]
+            )
+            answer = response.text.strip()                     
+            result[answer] = full_path                         
+
+    return result
+
+def crated_pdf(fill_name: str, ticket_image_path:str, id_path: str)-> str:
+    """Merge ticket scan + driver ID into one PDF with syntax filename."""
+
+    merge = PdfMerger()
+
+    merge.append(ticket_image_path)
+    merge.append(id_path)
+    
+
+    output_folder = "/Users/andreslinero/Desktop/Full Time Dev/Gen_AI/Scans/completed"
+    os.makedirs(output_folder, exist_ok=True)
+    pdf_file = os.path.join(output_folder, f"{fill_name}.pdf")
+
+    merge.write(pdf_file)
+    merge.close()
+    return f"PDF created: {pdf_file}"
+    
          
-# THIS IS REQUIRED - ADK looks for "root_agent"
+# # THIS IS REQUIRED - ADK looks for "root_agent"
+# root_agent = Agent(
+#     name="delivery_processor",
+#     model="gemini-2.5-flash-lite",
+#     instruction="""You are a delivery ticket processor.
+    
+#     When user asks for a PDF of an order:
+#     1. Use fetch_customer_data to get order details
+#     2. Use generate_filename to create the syntax name
+#     3. Use find_ID_plus_ticket to search for matching images
+#     4. Use crated_pdf to merge images into final PDF
+    
+#     When user asks for sales rep information:
+#     1. Use get_sale_rep to find the sales rep
+
+#     IMPORTANT: Always share results with the user.
+#     """,
+#     tools=[fetch_customer_data, generate_filename, 
+#            get_sale_rep, find_ID_plus_ticket, crated_pdf]
+#)
+
 root_agent = Agent(
     name="delivery_processor",
     model="gemini-2.5-flash-lite",
     instruction="""You are a delivery ticket processor.
     
-    When a user uploads an image of a delivery ticket:
-    1. Extract: Work Order, Order Type, Lease/Sales Number, Customer, Ship To address
-    2. Use the generate_filename tool to create the proper filename
-    3. Return the generated filename
-
-    When user asks for sales rep information:
-    1. Use the get_sale_rep tool to find the sales rep
-    2. ALWAYS respond to the user with the result you receive from the tool
+    When a user asks for a PDF of a work order:
     
-    IMPORTANT: After calling any tool, always share the result with the user in a clear response.
+    STEP 1: Call fetch_customer_data with the work order and month.
+    STEP 2: Call generate_filename using the data from Step 1.
+    STEP 3: Call find_ID_plus_ticket to scan for matching images.
+            DO NOT ask the user for a folder path. The tool knows where to look.
+    STEP 4: Call crated_pdf with the filename from Step 2
+            and the image paths from Step 3.
+    
+    NEVER ask the user for file paths, folder paths, or image locations.
+    The user only provides: work order number and month.
     """,
-    tools=[generate_filename, get_sale_rep]
+    tools=[fetch_customer_data, generate_filename, 
+           get_sale_rep, find_ID_plus_ticket, crated_pdf]
 )
-
-
