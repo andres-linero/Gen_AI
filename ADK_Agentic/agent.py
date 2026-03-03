@@ -12,7 +12,9 @@ from langchain_core.messages import HumanMessage
 from data_loader import get_data_loader
 from qdrant_store import get_qdrant_store
 
-load_dotenv()
+# Load .env from project root
+_agent_dir = os.path.dirname(__file__)
+load_dotenv(os.path.join(_agent_dir, "..", ".env"))
 
 
 class SkyTracAgent:
@@ -137,19 +139,21 @@ Always be clear about what information you're looking up."""
             return response
             
         except Exception as e:
-            print(f"Error: {str(e)}")
+            import logging
+            logging.getLogger(__name__).error("Agent query failed", exc_info=True)
             # Fallback: use simple tool calling
-            if "list" in user_input.lower():
-                return self.tools["list_all_orders"]()
-            elif "detail" in user_input.lower():
-                # Try to extract order ID
-                words = user_input.split()
-                for word in words:
-                    if "WO" in word or "SO" in word:
-                        return self.tools["get_order_details"](word)
-            
-            # Default: search
-            return self.tools["work_order_lookup"](user_input)
+            try:
+                if "list" in user_input.lower():
+                    return self.tools["list_all_orders"]()
+                elif "detail" in user_input.lower():
+                    words = user_input.split()
+                    for word in words:
+                        if "WO" in word or "SO" in word:
+                            return self.tools["get_order_details"](word)
+                return self.tools["work_order_lookup"](user_input)
+            except Exception:
+                logging.getLogger(__name__).error("Fallback also failed", exc_info=True)
+                return "Sorry, I could not process your request. Please try again."
     
     @staticmethod
     def _format_record(record: dict, max_fields: int = 5) -> str:

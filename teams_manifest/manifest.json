@@ -1,0 +1,63 @@
+{
+    "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.24/MicrosoftTeams.schema.json",
+    "manifestVersion": "1.24",
+    "version": "1.0.0",
+    "id": "<<MICROSOFT_APP_ID>>",
+    "developer": {
+        "name": "SkyTrac",
+        "websiteUrl": "https://skytrac.com",
+        "privacyUrl": "https://skytrac.com/privacy",
+        "termsOfUseUrl": "https://skytrac.com/terms"
+    },
+    "name": {
+        "short": "SkyTrac Assistant",
+        "full": "SkyTrac Work Order Assistant"
+    },
+    "description": {
+        "short": "AI-powered work order lookup",
+        "full": "SkyTrac AI assistant that helps you search, look up, and get details about work orders using natural language. Powered by Claude AI. Data source: internal work order spreadsheet only. No Microsoft 365 data is accessed."
+    },
+    "icons": {
+        "color": "color.png",
+        "outline": "outline.png"
+    },
+    "accentColor": "#4F6BED",
+    "bots": [
+        {
+            "botId": "<<MICROSOFT_APP_ID>>",
+            "scopes": [
+                "personal",
+                "team",
+                "groupChat"
+            ],
+            "commandLists": [
+                {
+                    "scopes": ["personal", "team", "groupChat"],
+                    "commands": [
+                        {
+                            "title": "help",
+                            "description": "Show available commands and usage"
+                        },
+                        {
+                            "title": "list orders",
+                            "description": "Show a summary of all work orders"
+                        },
+                        {
+                            "title": "search",
+                            "description": "Search work orders by keyword"
+                        }
+                    ]
+                }
+            ],
+            "supportsFiles": false,
+            "isNotificationOnly": false
+        }
+    ],
+    "permissions": [
+        "identity",
+        "messageTeamMembers"
+    ],
+    "validDomains": [
+        "<<YOUR_APP_SERVICE_NAME>>.azurewebsites.net"
+    ]
+}

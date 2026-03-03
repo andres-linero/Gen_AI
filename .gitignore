@@ -5,5 +5,11 @@ __pycache__/
 .DS_Store
 .adk/
 Run_test.ipynb
-Scans/.env
+Scans/
+*.xlsx
 acumatica_integration.ipynb
+
+# Bot
+bot/__pycache__/
+teams_manifest/*.zip
+audit_logs/

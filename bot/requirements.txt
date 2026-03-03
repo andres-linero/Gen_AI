@@ -1,0 +1,23 @@
+# Microsoft 365 Agents SDK for Python (Teams bot)
+microsoft-agents-hosting-aiohttp>=0.1.0
+microsoft-agents-hosting-core>=0.1.0
+microsoft-agents-authentication-msal>=0.1.0
+
+# Web framework
+aiohttp>=3.11.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# --- Agent dependencies (from ADK_Agentic) ---
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-anthropic>=0.1.15
+langgraph>=0.0.50
+anthropic>=0.28.0
+qdrant-client>=1.11.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+sentence-transformers>=2.3.0
+requests>=2.31.0
+reportlab>=4.0.0
