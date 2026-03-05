@@ -4,10 +4,12 @@ Uses create_agent with langgraph instead of deprecated AgentExecutor
 """
 
 import os
+import logging
+from typing import List, Optional
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from data_loader import get_data_loader
 from qdrant_store import get_qdrant_store
@@ -119,28 +121,41 @@ Always be clear about what information you're looking up."""
         print("✓ Agent created with new LangChain API")
         return agent
     
-    def query(self, user_input: str) -> str:
-        """Execute agent with user query"""
-        print(f"\n🤖 Agent processing: {user_input}\n")
-        
+    def query(self, user_input: str, history: Optional[List[dict]] = None) -> str:
+        """Execute agent with user query and optional conversation history.
+
+        Args:
+            user_input: The user's message.
+            history: Optional list of previous messages as dicts:
+                     [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}, ...]
+        """
+        logger = logging.getLogger(__name__)
+        logger.info(f"Agent processing: {user_input}")
+
         try:
-            # Use new message-based API
-            result = self.agent.invoke({
-                "messages": [HumanMessage(content=user_input)]
-            })
-            
+            # Build message list with history for context
+            messages = []
+            if history:
+                for msg in history:
+                    if msg["role"] == "user":
+                        messages.append(HumanMessage(content=msg["content"]))
+                    elif msg["role"] == "assistant":
+                        messages.append(AIMessage(content=msg["content"]))
+            messages.append(HumanMessage(content=user_input))
+
+            result = self.agent.invoke({"messages": messages})
+
             # Extract output from result
             if isinstance(result, dict) and "messages" in result:
                 last_message = result["messages"][-1]
                 response = last_message.content if hasattr(last_message, 'content') else str(last_message)
             else:
                 response = str(result)
-            
+
             return response
-            
+
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error("Agent query failed", exc_info=True)
+            logger.error("Agent query failed", exc_info=True)
             # Fallback: use simple tool calling
             try:
                 if "list" in user_input.lower():
@@ -152,7 +167,7 @@ Always be clear about what information you're looking up."""
                             return self.tools["get_order_details"](word)
                 return self.tools["work_order_lookup"](user_input)
             except Exception:
-                logging.getLogger(__name__).error("Fallback also failed", exc_info=True)
+                logger.error("Fallback also failed", exc_info=True)
                 return "Sorry, I could not process your request. Please try again."
     
     @staticmethod

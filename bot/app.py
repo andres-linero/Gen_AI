@@ -8,6 +8,7 @@ import sys
 import os
 import asyncio
 import logging
+from collections import defaultdict
 
 # Add ADK_Agentic to Python path so we can import the existing agent
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "ADK_Agentic"))
@@ -33,6 +34,28 @@ logger = logging.getLogger(__name__)
 
 # Max characters per Teams message
 TEAMS_MESSAGE_LIMIT = 4000
+
+# Max conversation history turns to keep per user (user + assistant = 1 turn)
+MAX_HISTORY_TURNS = 10
+
+# ---------------------------------------------------------------------------
+# Per-user conversation memory (in-process)
+# ---------------------------------------------------------------------------
+_chat_history: dict[str, list[dict]] = defaultdict(list)
+
+
+def _get_history(user_id: str) -> list[dict]:
+    """Return the conversation history for a user (capped)."""
+    return _chat_history[user_id]
+
+
+def _add_to_history(user_id: str, role: str, content: str):
+    """Append a message and trim to MAX_HISTORY_TURNS (pairs)."""
+    _chat_history[user_id].append({"role": role, "content": content})
+    # Each turn is 2 messages (user + assistant), so cap at 2 * MAX_HISTORY_TURNS
+    max_messages = MAX_HISTORY_TURNS * 2
+    if len(_chat_history[user_id]) > max_messages:
+        _chat_history[user_id] = _chat_history[user_id][-max_messages:]
 
 # ---------------------------------------------------------------------------
 # SkyTrac Agent singleton (lazy init — expensive to create)
@@ -116,9 +139,18 @@ async def on_help(context: TurnContext, _state: TurnState):
         "I can help you with:\n"
         "- **Search** work orders by keyword, customer, status, date\n"
         "- **Get details** for a specific order (e.g. *details for WO-001*)\n"
-        "- **List orders** to see a summary\n\n"
-        "Just type your question naturally!"
+        "- **List orders** to see a summary\n"
+        "- **/clear** to reset the conversation\n\n"
+        "I remember our conversation so you can ask follow-up questions!"
     )
+
+
+@app.message("/clear")
+async def on_clear(context: TurnContext, _state: TurnState):
+    """Clear conversation history for this user."""
+    user_id = getattr(context.activity.from_property, "id", "unknown")
+    _chat_history[user_id].clear()
+    await context.send_activity("Conversation history cleared. Let's start fresh!")
 
 
 @app.activity("message")
@@ -150,10 +182,15 @@ async def on_message(context: TurnContext, _state: TurnState):
     # --- Typing indicator ---
     await context.send_activity({"type": "typing"})
 
-    # --- Run the agent (sync → async bridge) ---
+    # --- Run the agent with conversation history ---
     try:
         agent = _get_agent()
-        response = await asyncio.to_thread(agent.query, sanitized)
+        history = _get_history(user_id)
+        response = await asyncio.to_thread(agent.query, sanitized, history)
+
+        # Store the exchange in memory
+        _add_to_history(user_id, "user", sanitized)
+        _add_to_history(user_id, "assistant", response)
 
         # Chunk if response exceeds Teams limit
         if len(response) > TEAMS_MESSAGE_LIMIT:
