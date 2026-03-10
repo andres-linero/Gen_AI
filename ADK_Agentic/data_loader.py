@@ -19,14 +19,22 @@ class DataLoader:
     def _load_excel(self):
         """Load Excel file"""
         excel_path = os.getenv("EXCEL_PATH")
-        
+
         if not os.path.exists(excel_path):
             print(f"✗ Excel file not found: {excel_path}")
             self.excel_df = pd.DataFrame()
             return
-        
+
         try:
             self.excel_df = pd.read_excel(excel_path)
+            # Normalize: convert to string and strip whitespace for key columns
+            for col in ['Order_ID', 'SO']:
+                if col in self.excel_df.columns:
+                    self.excel_df[col] = self.excel_df[col].astype(str).str.strip()
+            # Strip other string columns
+            for col in self.excel_df.select_dtypes(include='object').columns:
+                if col not in ('Order_ID', 'SO'):
+                    self.excel_df[col] = self.excel_df[col].str.strip()
             print(f"✓ Loaded {len(self.excel_df)} work orders from Excel")
         except Exception as e:
             print(f"✗ Error loading Excel: {str(e)}")
@@ -53,17 +61,19 @@ class DataLoader:
         return results
     
     def get_order_by_id(self, order_id: str) -> Optional[Dict]:
-        """Get specific order from Excel"""
+        """Get specific order by Order_ID or SO number"""
         if self.excel_df.empty:
             return None
-        
-        # Look for order by common ID column names
-        for col in ['OrderNbr', 'Order Number', 'ID', 'WorkOrder', 'OrderID']:
+
+        clean_id = order_id.strip().lstrip("0") or order_id.strip()
+
+        for col in ['Order_ID', 'SO']:
             if col in self.excel_df.columns:
-                result = self.excel_df[self.excel_df[col].astype(str) == order_id]
+                col_vals = self.excel_df[col].astype(str).str.strip().str.lstrip("0")
+                result = self.excel_df[col_vals == clean_id]
                 if not result.empty:
                     return result.iloc[0].to_dict()
-        
+
         return None
 
 

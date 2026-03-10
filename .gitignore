@@ -7,9 +7,14 @@ __pycache__/
 Run_test.ipynb
 Scans/
 *.xlsx
+*.pdf
 acumatica_integration.ipynb
 
 # Bot
 bot/__pycache__/
 teams_manifest/*.zip
 audit_logs/
+ADK_Agentic/logs/
+ADK_Agentic/cache/
+ADK_Agentic/output/
+ADK_Agentic/scans/
