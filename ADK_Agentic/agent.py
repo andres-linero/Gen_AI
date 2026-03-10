@@ -1,6 +1,7 @@
 """
-SkyTrac Agent - New LangChain API (v0.3+)
-Uses create_agent with langgraph instead of deprecated AgentExecutor
+SkyTrac Agent — LangChain + Claude
+Work order lookup, document compilation, and semantic search.
+All scan processing runs locally — no Teams channel access needed.
 """
 
 import os
@@ -11,7 +12,6 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from data_loader import get_data_loader
 from qdrant_store import get_qdrant_store
-from channel_scanner import ChannelScanner
 from scan_index import get_scan_index
 
 # Load .env from project root
@@ -21,8 +21,8 @@ load_dotenv(os.path.join(_agent_dir, "..", ".env"))
 
 class SkyTracAgent:
     def __init__(self):
-        """Initialize SkyTrac agent with new LangChain API"""
-        
+        """Initialize SkyTrac agent"""
+
         # Initialize LLM
         self.llm = ChatAnthropic(
             model="claude-opus-4-5-20251101",
@@ -30,30 +30,27 @@ class SkyTracAgent:
             api_key=os.getenv("CLAUDE_API_KEY")
         )
         print("✓ Claude LLM initialized")
-        
-        # Initialize data loader (Excel only for now)
+
+        # Data loader (Excel work orders)
         self.data_loader = get_data_loader()
 
-        # Channel scanner (Teams Graph API)
-        self.channel_scanner = ChannelScanner()
-
-        # Scan index (PDF page → order mapping)
+        # Scan index (PDF page → order mapping, runs locally)
         self.scan_index = get_scan_index()
         scan_pdf = os.getenv("SCAN_PDF_PATH")
         if scan_pdf and os.path.exists(scan_pdf):
             print("\nIndexing scan PDF...")
             self.scan_index.build_index(scan_pdf)
 
-        # Initialize vector store
+        # Vector store (semantic search)
         self.vector_store = get_qdrant_store()
-        
+
         # Load initial data
         self._initialize_vector_store()
-        
+
         # Define tools
         self.tools = self._create_tools()
-        
-        # Create agent using new API
+
+        # Create agent
         self.agent = self._create_agent()
     
     def _initialize_vector_store(self):
@@ -102,23 +99,6 @@ class SkyTracAgent:
                 output += f"{i}. {self._format_record(order)}\n"
             return output
         
-        async def find_scan_for_order(order_id: str) -> str:
-            """Search the Teams channel for a scanned document matching the given order ID or SO number."""
-            try:
-                matched_id = await self.channel_scanner.find_scan_for_order(order_id)
-                if not matched_id:
-                    return f"No scan found in the channel matching order {order_id}."
-                order = self.data_loader.get_order_by_id(matched_id)
-                if not order:
-                    return f"Scan found (read: {matched_id}) but no matching row in Excel."
-                return (
-                    f"📄 Scan matched!\n\n"
-                    f"{self._format_record(order)}\n\n"
-                    f"PDF Name: {self._pdf_name(order)}"
-                )
-            except Exception as e:
-                return f"Scan search failed: {e}"
-
         def get_order_documents(order_id: str) -> str:
             """Get full documentation for an order: Excel details + pre-classified scanned ticket PDF. Use when user asks for documents, PDF, or full documentation for an order."""
             order = self.data_loader.get_order_by_id(order_id)
@@ -152,7 +132,6 @@ class SkyTracAgent:
             "get_order_details": get_order_details,
             "get_order_documents": get_order_documents,
             "list_all_orders": list_all_orders,
-            "find_scan_for_order": find_scan_for_order,
         }
     
     def _create_agent(self):
@@ -165,13 +144,13 @@ CRITICAL TOOL SELECTION RULES:
   ALWAYS use get_order_details FIRST to do an exact lookup. NEVER use work_order_lookup for specific IDs.
 - Use work_order_lookup ONLY for general/fuzzy searches (e.g. "show me delayed orders", "orders for Harbor WP").
 - Use list_all_orders when the user wants to see all orders.
+- Use get_order_documents when the user asks for documents, PDFs, or full documentation.
 
 You help users:
 - Look up specific work orders by ID (use get_order_details)
 - Get full documentation with scanned ticket PDF (use get_order_documents)
 - Search orders by status, customer, date, etc. (use work_order_lookup)
 - List all available orders (use list_all_orders)
-- Find scanned documents in Teams channel (use find_scan_for_order)
 
 Always be clear about what information you're looking up."""
         

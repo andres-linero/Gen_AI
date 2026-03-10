@@ -16,8 +16,9 @@ from azure.core.credentials import AzureKeyCredential
 
 logger = logging.getLogger(__name__)
 
-# Crop to top 25% of image — where "Work Order No.: W-XXXXXX" lives
-HEADER_CROP_RATIO = 0.25
+# Crop to top 35% of image — captures "DELIVERY TICKET" header + order number
+# while excluding customer details, signatures, and ID cards below
+HEADER_CROP_RATIO = 0.35
 
 
 def _crop_header(image_bytes: bytes) -> bytes:

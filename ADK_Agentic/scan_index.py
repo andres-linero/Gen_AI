@@ -70,13 +70,13 @@ class ScanIndex:
 
         for page_num in range(len(doc)):
             page = doc[page_num]
-            # Render only top 25% of page — where order number lives
+            # Render only top 35% of page — captures header + order number
             page_rect = page.rect
             header_rect = fitz.Rect(
                 page_rect.x0,
                 page_rect.y0,
                 page_rect.x1,
-                page_rect.y0 + page_rect.height * 0.25,
+                page_rect.y0 + page_rect.height * 0.35,
             )
             pix = page.get_pixmap(dpi=200, clip=header_rect)
             image_bytes = pix.tobytes("png")
