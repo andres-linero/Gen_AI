@@ -1,7 +1,7 @@
 """
 SkyTrac Agent — LangChain + Claude
-Work order lookup, document compilation, and semantic search.
-All scan processing runs locally — no Teams channel access needed.
+Work order lookup, document compilation, and text search.
+All processing runs locally — no external data services needed.
 """
 
 import os
@@ -11,7 +11,6 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage
 
 from data_loader import get_data_loader
-from qdrant_store import get_qdrant_store
 from scan_index import get_scan_index
 from utils import pdf_name as _pdf_name_fn
 
@@ -42,12 +41,6 @@ class SkyTracAgent:
             print("\nIndexing scan PDF...")
             self.scan_index.build_index(scan_pdf)
 
-        # Vector store (semantic search)
-        self.vector_store = get_qdrant_store()
-
-        # Load initial data
-        self._initialize_vector_store()
-
         # Define tools
         self.tools = self._create_tools()
 
@@ -62,32 +55,18 @@ class SkyTracAgent:
         # Create agent
         self.agent = self._create_agent()
     
-    def _initialize_vector_store(self):
-        """Load data into vector store"""
-        print("\n📊 Loading data into vector store...")
-        records = self.data_loader.get_all_orders(limit=1000)
-        
-        if records:
-            self.vector_store.clear()
-            self.vector_store.add_records(records)
-            print(f"✓ Loaded {len(records)} records into vector store")
-        else:
-            print("⚠ No records found to load")
-    
     def _create_tools(self):
         """Define tool functions (not Tool objects)"""
         
         def work_order_lookup(query: str) -> str:
             """Search work orders by keyword, status, date, customer name, etc. Do NOT use this for specific order IDs — use get_order_details instead."""
-            results = self.vector_store.search(query, limit=5)
+            results = self.data_loader.search_orders(query, limit=5)
             if not results:
                 return "No work orders found matching that query."
-            
+
             output = f"Found {len(results)} matching work orders:\n\n"
-            for i, match in enumerate(results, 1):
-                record = match['record']
-                score = match['score']
-                output += f"{i}. {self._format_record(record)} (confidence: {score:.2f})\n"
+            for i, record in enumerate(results, 1):
+                output += f"{i}. {self._format_record(record)}\n"
             return output
         
         def get_order_details(order_id: str) -> str:
