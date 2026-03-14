@@ -3,8 +3,8 @@ Scan Index — Pre-scans multi-page PDFs, maps order IDs to page numbers,
 and auto-classifies by extracting each order's pages into individual files.
 
 After indexing, each order has:
-  - scans/{order_id}.pdf   (extracted pages)
-  - scans/{order_id}.png   (first page preview)
+  - upload_ready/{order_id}.pdf   (extracted pages)
+  - upload_ready/{order_id}.png   (first page preview)
 """
 
 import os
@@ -20,7 +20,7 @@ from ocr import extract_order_number
 logger = logging.getLogger(__name__)
 
 CACHE_DIR = Path(__file__).parent / "cache"
-SCANS_DIR = Path(__file__).parent / "scans"
+SCANS_DIR = Path(__file__).parent / "upload_ready"
 INDEX_FILE = CACHE_DIR / "scan_index.json"
 
 

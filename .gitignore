@@ -1,9 +1,12 @@
 agents_env/
 .env
+*.env.*
 __pycache__/
 *.pyc
 .DS_Store
 .adk/
+.vscode/
+.claude/
 Run_test.ipynb
 Scans/
 *.xlsx
@@ -18,3 +21,4 @@ ADK_Agentic/logs/
 ADK_Agentic/cache/
 ADK_Agentic/output/
 ADK_Agentic/scans/
+ADK_Agentic/upload_ready

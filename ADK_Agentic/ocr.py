@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 HEADER_CROP_RATIO = 0.35
 
 
-def _crop_header(image_bytes: bytes) -> bytes:
+def _crop_header(image_bytes: bytes, ratio: float = HEADER_CROP_RATIO) -> bytes:
     """
     Crop to the top portion of the image where the order number lives.
     Privacy: ensures customer names, addresses, signatures, and ID cards
@@ -29,18 +29,27 @@ def _crop_header(image_bytes: bytes) -> bytes:
     """
     img = Image.open(BytesIO(image_bytes))
     w, h = img.size
-    crop_box = (0, 0, w, int(h * HEADER_CROP_RATIO))
+    crop_box = (0, 0, w, int(h * ratio))
     cropped = img.crop(crop_box)
     buf = BytesIO()
     cropped.save(buf, format="PNG")
     return buf.getvalue()
 
 
-def extract_order_number(image_bytes: bytes, crop_header: bool = True) -> Optional[str]:
+# Larger crop for phone photos — more background/angle means header is lower
+ID_PHOTO_CROP_RATIO = 0.55
+
+
+def extract_order_number(
+    image_bytes: bytes,
+    crop_header: bool = True,
+    crop_ratio: float = HEADER_CROP_RATIO,
+) -> Optional[str]:
     """
     Send image to Azure Document Intelligence (prebuilt-read) and extract
     the work order ID or SO number via regex.
-    When crop_header=True (default), only the top 25% of the image is sent.
+    When crop_header=True (default), only the top portion of the image is sent.
+    Use crop_ratio to control how much (0.35 for clean PDFs, 0.55 for phone photos).
     Returns the matched string or None.
     """
     endpoint = os.getenv("AZURE_DOC_INTEL_ENDPOINT")
@@ -49,8 +58,8 @@ def extract_order_number(image_bytes: bytes, crop_header: bool = True) -> Option
         raise RuntimeError("AZURE_DOC_INTEL_ENDPOINT and AZURE_DOC_INTEL_KEY must be set.")
 
     if crop_header:
-        image_bytes = _crop_header(image_bytes)
-        logger.debug("Cropped image to top %d%% for privacy", int(HEADER_CROP_RATIO * 100))
+        image_bytes = _crop_header(image_bytes, ratio=crop_ratio)
+        logger.debug("Cropped image to top %d%% for privacy", int(crop_ratio * 100))
 
     client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
     poller = client.begin_analyze_document(

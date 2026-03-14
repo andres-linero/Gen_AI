@@ -13,6 +13,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from data_loader import get_data_loader
 from qdrant_store import get_qdrant_store
 from scan_index import get_scan_index
+from utils import pdf_name as _pdf_name_fn
 
 # Load .env from project root
 _agent_dir = os.path.dirname(__file__)
@@ -49,6 +50,14 @@ class SkyTracAgent:
 
         # Define tools
         self.tools = self._create_tools()
+
+        # Sync Excel with pipeline status on startup
+        print("\nSyncing Excel pipeline status...")
+        try:
+            from auto_compile import update_excel
+            update_excel()
+        except Exception as e:
+            print(f"Excel sync skipped: {e}")
 
         # Create agent
         self.agent = self._create_agent()
@@ -217,18 +226,7 @@ Always be clear about what information you're looking up."""
 
     @staticmethod
     def _pdf_name(record: dict) -> str:
-        """Build PDF name: [Shipment] Order_ID + Order_Type.SO + Customer_name + Ship_to"""
-        order_id = str(record.get('Order_ID', '')).strip()
-        order_type = str(record.get('Order_Type', '')).strip()
-        so = str(int(float(record['SO']))) if record.get('SO') is not None else ''
-        customer = str(record.get('Customer_name', '')).strip()
-        ship_to = str(record.get('Ship_to', '')).strip()
-
-        # Prefix with "Shipment" for shipment orders (SO type)
-        if order_type == "SO":
-            order_id = f"Shipment {order_id}"
-
-        return "_".join(filter(None, [order_id, f"{order_type}.{so}", customer, ship_to]))
+        return _pdf_name_fn(record)
 
 
 def create_agent_instance() -> SkyTracAgent:

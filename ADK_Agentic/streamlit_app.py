@@ -21,11 +21,11 @@ import streamlit.components.v1 as components
 
 from scan_index import get_scan_index, SCANS_DIR
 from data_loader import get_data_loader
-from ocr import extract_order_number
+from ocr import extract_order_number, ID_PHOTO_CROP_RATIO
 from pdf_compiler import compile_for_order
+from auto_compile import update_excel
 
-# Reuse _pdf_name from agent without instantiating the full LLM agent
-from agent import SkyTracAgent
+from utils import pdf_name as pdf_name_fn
 
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,7 +67,7 @@ page = st.sidebar.radio("Navigation", [
 
 st.sidebar.markdown("---")
 st.sidebar.caption(f"Orders indexed: {len(scan_index.index)}")
-st.sidebar.caption(f"Scan dir: {SCANS_DIR}")
+st.sidebar.caption(f"Upload ready: {SCANS_DIR}")
 
 if st.sidebar.button("Re-index Scans"):
     scan_pdf = os.getenv("SCAN_PDF_PATH")
@@ -220,7 +220,9 @@ def view_upload_compile():
 
         with col2:
             with st.spinner("Reading order number (cropped OCR)..."):
-                order_number = extract_order_number(image_bytes)
+                order_number = extract_order_number(
+                        image_bytes, crop_ratio=ID_PHOTO_CROP_RATIO
+                    )
 
             if not order_number and manual_order and manual_order.strip():
                 order_number = manual_order.strip()
@@ -260,7 +262,7 @@ def view_upload_compile():
                                 id_image_paths=[tmp_path],
                                 scan_index=scan_index,
                                 data_loader=data_loader,
-                                pdf_name_fn=SkyTracAgent._pdf_name,
+                                pdf_name_fn=pdf_name_fn,
                             )
                         finally:
                             os.unlink(tmp_path)
@@ -271,6 +273,8 @@ def view_upload_compile():
                         st.success(
                             f"Compiled! {ticket_pages} ticket + 1 ID = **{total} pages**"
                         )
+                        # Sync pipeline status back to Excel
+                        update_excel()
                         with open(result_path, "rb") as f:
                             st.download_button(
                                 "Download Compiled PDF",

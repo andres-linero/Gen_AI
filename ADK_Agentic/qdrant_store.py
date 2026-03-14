@@ -1,3 +1,5 @@
+# TODO: Evaluate security — currently sends work order data to Qdrant Cloud.
+#       Options: (1) self-host Qdrant via Docker, (2) replace with local text search.
 """
 Qdrant Vector Store for Work Order Search
 Uses sentence-transformers for embeddings + Qdrant Cloud for vector search.
